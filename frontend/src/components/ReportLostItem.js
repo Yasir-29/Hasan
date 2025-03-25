@@ -79,7 +79,6 @@ const ReportLostItem = () => {
         ...formData,
         image: e.target.files[0]
       });
-      // We don't save the image to localStorage as it's not serializable
     }
   };
 
@@ -265,6 +264,15 @@ const ReportLostItem = () => {
                 />
               </Button>
             </Grid>
+            {formData.image && (
+              <Grid item xs={12}>
+                <img
+                  src={URL.createObjectURL(formData.image)}
+                  alt="Uploaded"
+                  style={{ maxWidth: '100%', height: 'auto' }}
+                />
+              </Grid>
+            )}
             <Grid item xs={12}>
               <Button
                 type="submit"

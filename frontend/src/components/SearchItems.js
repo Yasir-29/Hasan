@@ -3,6 +3,7 @@ import { Container, Typography, TextField, Button, Grid, MenuItem, Box, Paper, C
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { searchItems, getAllItems } from '../services/api';
+import placeholder1 from '../images/placeholder1.jpg'; // Import placeholder image
 
 const SearchItems = () => {
   const [searchParams, setSearchParams] = useState({
@@ -257,7 +258,7 @@ const SearchItems = () => {
               <CardMedia
                 component="img"
                 height="200"
-                image={item.image}
+                image={placeholder1}
                 alt={item.name}
               />
               <CardContent sx={{ flexGrow: 1 }}>
