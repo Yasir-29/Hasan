@@ -7,7 +7,17 @@ const auth = require('../middleware/auth');
 // Register a new user
 router.post('/register', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { 
+            name, 
+            email, 
+            password, 
+            phone, 
+            address, 
+            city, 
+            state, 
+            zipCode, 
+            bio 
+        } = req.body;
 
         // Check if user already exists
         let user = await User.findOne({ email });
@@ -19,7 +29,16 @@ router.post('/register', async (req, res) => {
         user = new User({
             name,
             email,
-            password
+            password,
+            phone: phone || '',
+            address: address || '',
+            city: city || '',
+            state: state || '',
+            zipCode: zipCode || '',
+            bio: bio || '',
+            points: 0,
+            badges: [],
+            level: 'Bronze'
         });
 
         await user.save();
@@ -36,7 +55,16 @@ router.post('/register', async (req, res) => {
             user: {
                 id: user._id,
                 name: user.name,
-                email: user.email
+                email: user.email,
+                phone: user.phone,
+                address: user.address,
+                city: user.city,
+                state: user.state,
+                zipCode: user.zipCode,
+                bio: user.bio,
+                points: user.points,
+                badges: user.badges,
+                level: user.level
             }
         });
     } catch (error) {
@@ -74,7 +102,16 @@ router.post('/login', async (req, res) => {
             user: {
                 id: user._id,
                 name: user.name,
-                email: user.email
+                email: user.email,
+                phone: user.phone,
+                address: user.address,
+                city: user.city,
+                state: user.state,
+                zipCode: user.zipCode,
+                bio: user.bio,
+                points: user.points,
+                badges: user.badges,
+                level: user.level
             }
         });
     } catch (error) {

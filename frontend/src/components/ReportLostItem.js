@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Typography, TextField, Button, Grid, MenuItem, Box, Paper } from '@mui/material';
+import { Container, Typography, TextField, Button, Grid, MenuItem, Box, Paper, FormControlLabel, Switch, Alert } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
-import { reportLostItem } from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { reportLostItem, updateLostItem, getLostItemById } from '../services/api';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
 const ReportLostItem = () => {
   const navigate = useNavigate();
+  const { id } = useParams(); // Get item ID from URL if editing
+  const location = useLocation();
+  const isEditing = location.state?.isEditing || false;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
   const [formData, setFormData] = useState({
     itemName: '',
     category: '',
@@ -17,21 +23,79 @@ const ReportLostItem = () => {
     uniqueIdentifiers: '',
     contactInfo: '',
     reward: '',
+    isEmergency: false,
     image: null
   });
 
-  // Load form data from local storage when component mounts
+  // Load item data for editing or from local storage for new item
   useEffect(() => {
-    const savedFormData = localStorage.getItem('lostItemFormData');
-    if (savedFormData) {
-      const parsedData = JSON.parse(savedFormData);
-      // Convert date string back to Date object if it exists
-      if (parsedData.dateLost) {
-        parsedData.dateLost = new Date(parsedData.dateLost);
+    const fetchItemData = async () => {
+      // If we're editing an existing item
+      if (isEditing && id) {
+        try {
+          setLoading(true);
+          console.log("Fetching lost item with ID:", id);
+          
+          // First check if item data is available in location state
+          if (location.state?.item) {
+            const itemFromState = location.state.item;
+            console.log("Using item data from navigation state:", itemFromState);
+            
+            setFormData({
+              itemName: itemFromState.name || '',
+              category: itemFromState.category || '',
+              description: itemFromState.description || '',
+              dateLost: itemFromState.dateLost ? new Date(itemFromState.dateLost) : null,
+              location: itemFromState.location || '',
+              color: itemFromState.color || '',
+              uniqueIdentifiers: itemFromState.uniqueIdentifiers || '',
+              contactInfo: itemFromState.contactInfo || '',
+              reward: itemFromState.reward || '',
+              isEmergency: itemFromState.isEmergency || false,
+              image: null
+            });
+            setLoading(false);
+          } else {
+            // Fetch from API if not available in state
+            const itemData = await getLostItemById(id);
+            console.log("Fetched item data from API:", itemData);
+            
+            setFormData({
+              itemName: itemData.name || '',
+              category: itemData.category || '',
+              description: itemData.description || '',
+              dateLost: itemData.dateLost ? new Date(itemData.dateLost) : null,
+              location: itemData.location || '',
+              color: itemData.color || '',
+              uniqueIdentifiers: itemData.uniqueIdentifiers || '',
+              contactInfo: itemData.contactInfo || '',
+              reward: itemData.reward || '',
+              isEmergency: itemData.isEmergency || false,
+              image: null // We can't retrieve the image this way
+            });
+            setLoading(false);
+          }
+        } catch (err) {
+          console.error('Error fetching item data:', err);
+          setError('Failed to load item data. Please try again.');
+          setLoading(false);
+        }
+      } else {
+        // Load form data from local storage when component mounts (for new items)
+        const savedFormData = localStorage.getItem('lostItemFormData');
+        if (savedFormData) {
+          const parsedData = JSON.parse(savedFormData);
+          // Convert date string back to Date object if it exists
+          if (parsedData.dateLost) {
+            parsedData.dateLost = new Date(parsedData.dateLost);
+          }
+          // We can't store the image in localStorage, so it will remain null
+          setFormData(parsedData);
+        }
       }
-      // We can't store the image in localStorage, so it will remain null
-      setFormData(parsedData);
-    }
+    };
+
+    fetchItemData();
 
     // Check if user is logged in
     const token = localStorage.getItem('token');
@@ -39,11 +103,12 @@ const ReportLostItem = () => {
       alert('Please log in to report a lost item');
       navigate('/login');
     }
-  }, [navigate]);
+  }, [navigate, id, isEditing, location.state]);
 
   const categories = [
-    'Electronics', 'Jewelry', 'Clothing', 'Accessories', 'Documents', 
-    'Keys', 'Wallet/Purse', 'Bag/Backpack', 'Other'
+    'Electronics', 'Jewelry', 'Clothing', 'Accessories', 
+    'Important Documents', 'Keys', 'Wallet/Purse', 'Bag/Backpack', 
+    'Identification', 'Passport', 'Credit/Debit Cards', 'Other'
   ];
 
   const handleChange = (e) => {
@@ -54,10 +119,30 @@ const ReportLostItem = () => {
     };
     setFormData(updatedFormData);
     
-    // Save to local storage (excluding the image)
-    const dataForStorage = { ...updatedFormData };
-    delete dataForStorage.image;
-    localStorage.setItem('lostItemFormData', JSON.stringify(dataForStorage));
+    // Only save to local storage if not editing
+    if (!isEditing) {
+      // Save to local storage (excluding the image)
+      const dataForStorage = { ...updatedFormData };
+      delete dataForStorage.image;
+      localStorage.setItem('lostItemFormData', JSON.stringify(dataForStorage));
+    }
+  };
+
+  const handleSwitchChange = (e) => {
+    const { name, checked } = e.target;
+    const updatedFormData = {
+      ...formData,
+      [name]: checked
+    };
+    setFormData(updatedFormData);
+    
+    // Only save to local storage if not editing
+    if (!isEditing) {
+      // Save to local storage (excluding the image)
+      const dataForStorage = { ...updatedFormData };
+      delete dataForStorage.image;
+      localStorage.setItem('lostItemFormData', JSON.stringify(dataForStorage));
+    }
   };
 
   const handleDateChange = (date) => {
@@ -67,10 +152,13 @@ const ReportLostItem = () => {
     };
     setFormData(updatedFormData);
     
-    // Save to local storage (excluding the image)
-    const dataForStorage = { ...updatedFormData };
-    delete dataForStorage.image;
-    localStorage.setItem('lostItemFormData', JSON.stringify(dataForStorage));
+    // Only save to local storage if not editing
+    if (!isEditing) {
+      // Save to local storage (excluding the image)
+      const dataForStorage = { ...updatedFormData };
+      delete dataForStorage.image;
+      localStorage.setItem('lostItemFormData', JSON.stringify(dataForStorage));
+    }
   };
 
   const handleImageChange = (e) => {
@@ -82,8 +170,15 @@ const ReportLostItem = () => {
     }
   };
 
+  // Check if the item is a high-value item based on category
+  const isHighValueItem = () => {
+    const highValueCategories = ['Passport', 'Identification', 'Important Documents', 'Credit/Debit Cards', 'Jewelry'];
+    return highValueCategories.includes(formData.category);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
       // Check if user is logged in
       const token = localStorage.getItem('token');
@@ -104,34 +199,122 @@ const ReportLostItem = () => {
         uniqueIdentifiers: formData.uniqueIdentifiers,
         contactInfo: formData.contactInfo,
         reward: formData.reward,
+        isEmergency: formData.isEmergency,
         status: 'lost'
       };
 
-      // Send data to backend
-      await reportLostItem(itemData);
+      setLoading(true);
       
-      // Clear the form data from local storage after successful submission
-      localStorage.removeItem('lostItemFormData');
+      // Check if we're editing a mock item (IDs starting with '10')
+      const isMockItem = typeof id === 'string' && id.startsWith('10');
+      console.log('Is mock item:', isMockItem, 'Item ID:', id);
+
+      if (isEditing && id) {
+        if (isMockItem) {
+          console.log('Updating mock item, no API call needed');
+          // For mock items, we'll update the item in localStorage
+          const storedItems = localStorage.getItem('userLostItems');
+          if (storedItems) {
+            const items = JSON.parse(storedItems);
+            const updatedItems = items.map(item => {
+              if (item.id === id) {
+                return {
+                  ...item,
+                  name: itemData.name,
+                  category: itemData.category,
+                  description: itemData.description,
+                  dateLost: itemData.dateLost ? new Date(itemData.dateLost).toISOString() : null,
+                  date: itemData.dateLost ? new Date(itemData.dateLost).toISOString().split('T')[0] : item.date,
+                  location: itemData.location,
+                  color: itemData.color,
+                  uniqueIdentifiers: itemData.uniqueIdentifiers,
+                  contactInfo: itemData.contactInfo,
+                  reward: itemData.reward,
+                  isEmergency: itemData.isEmergency
+                };
+              }
+              return item;
+            });
+            localStorage.setItem('userLostItems', JSON.stringify(updatedItems));
+            
+            // Simulate API delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } else {
+          // Update existing item via API
+          await updateLostItem(id, itemData);
+        }
+        alert('Your lost item has been updated successfully!');
+      } else {
+        // Create new item
+        await reportLostItem(itemData);
+        // Clear the form data from local storage after successful submission
+        localStorage.removeItem('lostItemFormData');
+        
+        // Add the new item to the user's lost items in localStorage
+        const storedLostItems = localStorage.getItem('userLostItems') || '[]';
+        const lostItems = JSON.parse(storedLostItems);
+        
+        // Create a mock item for immediate display in profile
+        const newItem = {
+          id: `1${Date.now().toString().slice(-4)}`, // Create a mock ID starting with '1'
+          name: itemData.name,
+          category: itemData.category,
+          description: itemData.description,
+          date: itemData.dateLost ? new Date(itemData.dateLost).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          location: itemData.location,
+          color: itemData.color,
+          uniqueIdentifiers: itemData.uniqueIdentifiers,
+          contactInfo: itemData.contactInfo,
+          reward: itemData.reward,
+          isEmergency: itemData.isEmergency,
+          isResolved: false,
+          image: 'https://via.placeholder.com/150' // Default placeholder image
+        };
+        
+        // Add to the beginning of the array
+        lostItems.unshift(newItem);
+        localStorage.setItem('userLostItems', JSON.stringify(lostItems));
+        
+        // Special alert for emergency items
+        if (formData.isEmergency) {
+          alert('EMERGENCY REPORT: Your valuable item has been reported with priority status. Our team has been notified and will take immediate action.');
+        } else {
+          alert('Your lost item has been reported successfully!');
+        }
+      }
       
-      // Reset the form
-      setFormData({
-        itemName: '',
-        category: '',
-        description: '',
-        dateLost: null,
-        location: '',
-        color: '',
-        uniqueIdentifiers: '',
-        contactInfo: '',
-        reward: '',
-        image: null
+      setLoading(false);
+      
+      // Reset the form if not editing
+      if (!isEditing) {
+        setFormData({
+          itemName: '',
+          category: '',
+          description: '',
+          dateLost: null,
+          location: '',
+          color: '',
+          uniqueIdentifiers: '',
+          contactInfo: '',
+          reward: '',
+          isEmergency: false,
+          image: null
+        });
+      }
+      
+      // Navigate to profile with state information about the new item
+      navigate('/profile', { 
+        state: { 
+          newItem: true, 
+          itemType: 'lost item',
+          severity: formData.isEmergency ? 'warning' : 'success'
+        } 
       });
-      
-      alert('Your lost item has been reported successfully!');
-      navigate('/dashboard'); // or wherever you want to redirect after success
     } catch (error) {
-      console.error('Error reporting lost item:', error);
-      alert('Failed to report lost item. Please try again.');
+      setLoading(false);
+      console.error('Error with lost item:', error);
+      setError('Failed to process lost item. Please try again.');
     }
   };
 
@@ -139,11 +322,25 @@ const ReportLostItem = () => {
     <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Report a Lost Item
+          {isEditing ? 'Edit Lost Item' : 'Report a Lost Item'}
         </Typography>
         <Typography variant="body1" color="textSecondary" paragraph>
           Please provide as much detail as possible to help us find your item.
         </Typography>
+
+        {error && (
+          <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+            {error}
+          </Typography>
+        )}
+
+        {isHighValueItem() && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="subtitle2">
+              This appears to be a high-value or important item. Consider enabling Emergency Mode for faster response.
+            </Typography>
+          </Alert>
+        )}
 
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
           <Grid container spacing={3}>
@@ -193,7 +390,12 @@ const ReportLostItem = () => {
                   label="Date Lost"
                   value={formData.dateLost}
                   onChange={handleDateChange}
-                  renderInput={(params) => <TextField {...params} fullWidth required />}
+                  slotProps={{ 
+                    textField: { 
+                      fullWidth: true,
+                      required: true 
+                    } 
+                  }}
                 />
               </LocalizationProvider>
             </Grid>
@@ -258,33 +460,75 @@ const ReportLostItem = () => {
                 Upload Image
                 <input
                   type="file"
-                  hidden
                   accept="image/*"
+                  hidden
                   onChange={handleImageChange}
                 />
               </Button>
             </Grid>
-            {formData.image && (
-              <Grid item xs={12}>
-                <img
-                  src={URL.createObjectURL(formData.image)}
-                  alt="Uploaded"
-                  style={{ maxWidth: '100%', height: 'auto' }}
+            
+            <Grid item xs={12}>
+              <Paper 
+                elevation={1} 
+                sx={{ 
+                  p: 2, 
+                  bgcolor: formData.isEmergency ? 'error.50' : 'background.paper',
+                  border: formData.isEmergency ? '1px solid' : 'none',
+                  borderColor: 'error.main'
+                }}
+              >
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.isEmergency}
+                      onChange={handleSwitchChange}
+                      name="isEmergency"
+                      color="error"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="subtitle1" color={formData.isEmergency ? 'error' : 'text.primary'} fontWeight={formData.isEmergency ? 'bold' : 'normal'}>
+                        Emergency Mode
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Enable for high-priority items (passports, IDs, valuables). Activates immediate notifications to our team.
+                      </Typography>
+                    </Box>
+                  }
                 />
-              </Grid>
-            )}
+                {formData.isEmergency && (
+                  <Alert severity="error" sx={{ mt: 1 }}>
+                    Emergency mode activated. Your report will be treated with highest priority.
+                  </Alert>
+                )}
+              </Paper>
+            </Grid>
+            
             <Grid item xs={12}>
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
-                color="primary"
                 size="large"
-                sx={{ mt: 2 }}
+                disabled={loading}
+                color={formData.isEmergency ? "error" : "primary"}
               >
-                Submit Report
+                {loading ? 'Processing...' : isEditing ? 'Update Item' : 'Submit Report'}
               </Button>
             </Grid>
+            {isEditing && (
+              <Grid item xs={12}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  size="large"
+                  onClick={() => navigate('/profile')}
+                >
+                  Cancel
+                </Button>
+              </Grid>
+            )}
           </Grid>
         </Box>
       </Paper>

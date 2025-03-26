@@ -5,7 +5,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Navbar from './components/Navbar';
 import Home from './components/Home';
 import Login from './components/Login';
-import Dashboard from './components/Dashboard';
 import ReportLostItem from './components/ReportLostItem';
 import ReportFoundItem from './components/ReportFoundItem';
 import SearchItems from './components/SearchItems';
@@ -44,14 +43,6 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/search" element={<SearchItems />} />
           <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/report-lost"
             element={
               <ProtectedRoute>
@@ -67,8 +58,31 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/edit-lost/:id"
+            element={
+              <ProtectedRoute>
+                <ReportLostItem />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/edit-found/:id"
+            element={
+              <ProtectedRoute>
+                <ReportFoundItem />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/map" element={<MapView />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } 
+          />
         </Routes>
       </Router>
     </ThemeProvider>

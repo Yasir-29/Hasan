@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Container, Typography, TextField, Button, Box, Paper, Tab, Tabs, Alert } from '@mui/material';
+import { Container, Typography, TextField, Button, Box, Paper, Tab, Tabs, Alert, Grid } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { login, register } from '../services/authService';
 
@@ -20,7 +20,13 @@ const Login = () => {
         name: '',
         email: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        bio: ''
     });
 
     const handleTabChange = (event, newValue) => {
@@ -50,7 +56,7 @@ const Login = () => {
             setLoading(true);
             setError('');
             await login(loginData);
-            navigate('/dashboard'); // or wherever you want to redirect after login
+            navigate('/profile'); // Redirect to profile page instead of dashboard
         } catch (err) {
             setError(err.message || 'Failed to login. Please try again.');
         } finally {
@@ -73,9 +79,15 @@ const Login = () => {
             await register({
                 name: registerData.name,
                 email: registerData.email,
-                password: registerData.password
+                password: registerData.password,
+                phone: registerData.phone,
+                address: registerData.address,
+                city: registerData.city,
+                state: registerData.state,
+                zipCode: registerData.zipCode,
+                bio: registerData.bio
             });
-            navigate('/dashboard'); // or wherever you want to redirect after registration
+            navigate('/profile'); // Redirect to profile page instead of dashboard
         } catch (err) {
             setError(err.message || 'Failed to register. Please try again.');
         } finally {
@@ -147,51 +159,123 @@ const Login = () => {
                     ) : (
                         // Register Form
                         <Box component="form" onSubmit={handleRegister}>
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                id="name"
-                                label="Full Name"
-                                name="name"
-                                autoComplete="name"
-                                autoFocus
-                                value={registerData.name}
-                                onChange={handleRegisterChange}
-                            />
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                id="email"
-                                label="Email Address"
-                                name="email"
-                                autoComplete="email"
-                                value={registerData.email}
-                                onChange={handleRegisterChange}
-                            />
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                name="password"
-                                label="Password"
-                                type="password"
-                                id="password"
-                                value={registerData.password}
-                                onChange={handleRegisterChange}
-                            />
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                name="confirmPassword"
-                                label="Confirm Password"
-                                type="password"
-                                id="confirmPassword"
-                                value={registerData.confirmPassword}
-                                onChange={handleRegisterChange}
-                            />
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        required
+                                        fullWidth
+                                        id="name"
+                                        label="Full Name"
+                                        name="name"
+                                        autoComplete="name"
+                                        value={registerData.name}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        required
+                                        fullWidth
+                                        id="email"
+                                        label="Email Address"
+                                        name="email"
+                                        autoComplete="email"
+                                        value={registerData.email}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        required
+                                        fullWidth
+                                        name="password"
+                                        label="Password"
+                                        type="password"
+                                        id="password"
+                                        value={registerData.password}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <TextField
+                                        required
+                                        fullWidth
+                                        name="confirmPassword"
+                                        label="Confirm Password"
+                                        type="password"
+                                        id="confirmPassword"
+                                        value={registerData.confirmPassword}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        name="phone"
+                                        label="Phone Number"
+                                        id="phone"
+                                        autoComplete="tel"
+                                        value={registerData.phone}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        name="address"
+                                        label="Address"
+                                        id="address"
+                                        autoComplete="street-address"
+                                        value={registerData.address}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        name="city"
+                                        label="City"
+                                        id="city"
+                                        autoComplete="address-level2"
+                                        value={registerData.city}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        name="state"
+                                        label="State"
+                                        id="state"
+                                        autoComplete="address-level1"
+                                        value={registerData.state}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                    <TextField
+                                        fullWidth
+                                        name="zipCode"
+                                        label="Zip Code"
+                                        id="zipCode"
+                                        autoComplete="postal-code"
+                                        value={registerData.zipCode}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                                <Grid item xs={12}>
+                                    <TextField
+                                        fullWidth
+                                        name="bio"
+                                        label="Bio (About Yourself)"
+                                        id="bio"
+                                        multiline
+                                        rows={3}
+                                        value={registerData.bio}
+                                        onChange={handleRegisterChange}
+                                    />
+                                </Grid>
+                            </Grid>
                             <Button
                                 type="submit"
                                 fullWidth

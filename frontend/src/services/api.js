@@ -44,6 +44,66 @@ export const reportFoundItem = async (itemData) => {
     }
 };
 
+// Update lost item
+export const updateLostItem = async (id, itemData) => {
+    try {
+        const response = await api.put(`/items/lost/${id}`, itemData);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error.message;
+    }
+};
+
+// Update found item
+export const updateFoundItem = async (id, itemData) => {
+    try {
+        const response = await api.put(`/items/found/${id}`, itemData);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error.message;
+    }
+};
+
+// Delete lost item
+export const deleteLostItem = async (id) => {
+    try {
+        const response = await api.delete(`/items/lost/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error.message;
+    }
+};
+
+// Delete found item
+export const deleteFoundItem = async (id) => {
+    try {
+        const response = await api.delete(`/items/found/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error.message;
+    }
+};
+
+// Get a single lost item by ID
+export const getLostItemById = async (id) => {
+    try {
+        const response = await api.get(`/items/lost/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error.message;
+    }
+};
+
+// Get a single found item by ID
+export const getFoundItemById = async (id) => {
+    try {
+        const response = await api.get(`/items/found/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error.response ? error.response.data : error.message;
+    }
+};
+
 // Get all items
 export const getAllItems = async () => {
     try {
