@@ -4,6 +4,8 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { reportLostItem, updateLostItem, getLostItemById } from '../services/api';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const ReportLostItem = () => {
   const navigate = useNavigate();
@@ -12,6 +14,8 @@ const ReportLostItem = () => {
   const isEditing = location.state?.isEditing || false;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [map, setMap] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
   
   const [formData, setFormData] = useState({
     itemName: '',
@@ -24,8 +28,43 @@ const ReportLostItem = () => {
     contactInfo: '',
     reward: '',
     isEmergency: false,
-    image: null
+    image: null,
+    coordinates: null
   });
+
+  // Initialize map
+  useEffect(() => {
+    // Initialize map
+    const mapInstance = L.map('location-picker').setView([51.505, -0.09], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(mapInstance);
+
+    // Add click handler to map
+    let marker;
+    mapInstance.on('click', (e) => {
+      const { lat, lng } = e.latlng;
+      if (marker) {
+        marker.setLatLng([lat, lng]);
+      } else {
+        marker = L.marker([lat, lng]).addTo(mapInstance);
+      }
+      setSelectedLocation({ lat, lng });
+      setFormData(prev => ({
+        ...prev,
+        coordinates: { lat, lng },
+        location: `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+      }));
+    });
+
+    setMap(mapInstance);
+
+    // Cleanup
+    return () => {
+      mapInstance.remove();
+    };
+  }, []);
 
   // Load item data for editing or from local storage for new item
   useEffect(() => {
@@ -82,16 +121,16 @@ const ReportLostItem = () => {
         }
       } else {
         // Load form data from local storage when component mounts (for new items)
-        const savedFormData = localStorage.getItem('lostItemFormData');
-        if (savedFormData) {
-          const parsedData = JSON.parse(savedFormData);
-          // Convert date string back to Date object if it exists
-          if (parsedData.dateLost) {
-            parsedData.dateLost = new Date(parsedData.dateLost);
-          }
-          // We can't store the image in localStorage, so it will remain null
-          setFormData(parsedData);
-        }
+    const savedFormData = localStorage.getItem('lostItemFormData');
+    if (savedFormData) {
+      const parsedData = JSON.parse(savedFormData);
+      // Convert date string back to Date object if it exists
+      if (parsedData.dateLost) {
+        parsedData.dateLost = new Date(parsedData.dateLost);
+      }
+      // We can't store the image in localStorage, so it will remain null
+      setFormData(parsedData);
+    }
       }
     };
 
@@ -138,10 +177,10 @@ const ReportLostItem = () => {
     
     // Only save to local storage if not editing
     if (!isEditing) {
-      // Save to local storage (excluding the image)
-      const dataForStorage = { ...updatedFormData };
-      delete dataForStorage.image;
-      localStorage.setItem('lostItemFormData', JSON.stringify(dataForStorage));
+    // Save to local storage (excluding the image)
+    const dataForStorage = { ...updatedFormData };
+    delete dataForStorage.image;
+    localStorage.setItem('lostItemFormData', JSON.stringify(dataForStorage));
     }
   };
 
@@ -154,10 +193,10 @@ const ReportLostItem = () => {
     
     // Only save to local storage if not editing
     if (!isEditing) {
-      // Save to local storage (excluding the image)
-      const dataForStorage = { ...updatedFormData };
-      delete dataForStorage.image;
-      localStorage.setItem('lostItemFormData', JSON.stringify(dataForStorage));
+    // Save to local storage (excluding the image)
+    const dataForStorage = { ...updatedFormData };
+    delete dataForStorage.image;
+    localStorage.setItem('lostItemFormData', JSON.stringify(dataForStorage));
     }
   };
 
@@ -230,7 +269,9 @@ const ReportLostItem = () => {
                   uniqueIdentifiers: itemData.uniqueIdentifiers,
                   contactInfo: itemData.contactInfo,
                   reward: itemData.reward,
-                  isEmergency: itemData.isEmergency
+                  isEmergency: itemData.isEmergency,
+                  isResolved: item.isResolved, // Preserve the resolved status
+                  resolvedDate: item.resolvedDate // Preserve the resolved date if it exists
                 };
               }
               return item;
@@ -247,34 +288,8 @@ const ReportLostItem = () => {
         alert('Your lost item has been updated successfully!');
       } else {
         // Create new item
-        await reportLostItem(itemData);
-        // Clear the form data from local storage after successful submission
-        localStorage.removeItem('lostItemFormData');
-        
-        // Add the new item to the user's lost items in localStorage
-        const storedLostItems = localStorage.getItem('userLostItems') || '[]';
-        const lostItems = JSON.parse(storedLostItems);
-        
-        // Create a mock item for immediate display in profile
-        const newItem = {
-          id: `1${Date.now().toString().slice(-4)}`, // Create a mock ID starting with '1'
-          name: itemData.name,
-          category: itemData.category,
-          description: itemData.description,
-          date: itemData.dateLost ? new Date(itemData.dateLost).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          location: itemData.location,
-          color: itemData.color,
-          uniqueIdentifiers: itemData.uniqueIdentifiers,
-          contactInfo: itemData.contactInfo,
-          reward: itemData.reward,
-          isEmergency: itemData.isEmergency,
-          isResolved: false,
-          image: 'https://via.placeholder.com/150' // Default placeholder image
-        };
-        
-        // Add to the beginning of the array
-        lostItems.unshift(newItem);
-        localStorage.setItem('userLostItems', JSON.stringify(lostItems));
+        const response = await reportLostItem(itemData);
+        console.log('New item created:', response);
         
         // Special alert for emergency items
         if (formData.isEmergency) {
@@ -319,30 +334,19 @@ const ReportLostItem = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          {isEditing ? 'Edit Lost Item' : 'Report a Lost Item'}
-        </Typography>
-        <Typography variant="body1" color="textSecondary" paragraph>
-          Please provide as much detail as possible to help us find your item.
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h4" gutterBottom>
+          {isEditing ? 'Edit Lost Item' : 'Report Lost Item'}
         </Typography>
 
         {error && (
-          <Typography variant="body2" color="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ mb: 2 }}>
             {error}
-          </Typography>
-        )}
-
-        {isHighValueItem() && (
-          <Alert severity="info" sx={{ mb: 3 }}>
-            <Typography variant="subtitle2">
-              This appears to be a high-value or important item. Consider enabling Emergency Mode for faster response.
-            </Typography>
           </Alert>
         )}
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
+        <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
             <Grid item xs={12} sm={6}>
               <TextField
@@ -399,15 +403,25 @@ const ReportLostItem = () => {
                 />
               </LocalizationProvider>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Select Location on Map
+              </Typography>
+              <Paper elevation={1} sx={{ p: 1, mb: 2 }}>
+                <div id="location-picker" style={{ height: '400px', width: '100%' }}></div>
+              </Paper>
+            </Grid>
+            <Grid item xs={12}>
               <TextField
                 required
                 fullWidth
-                label="Location Lost"
+                label="Location Details"
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
-                placeholder="Be as specific as possible"
+                placeholder="Click on the map or enter location details manually"
+                multiline
+                rows={2}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -467,7 +481,7 @@ const ReportLostItem = () => {
               </Button>
             </Grid>
             
-            <Grid item xs={12}>
+              <Grid item xs={12}>
               <Paper 
                 elevation={1} 
                 sx={{ 
@@ -503,7 +517,7 @@ const ReportLostItem = () => {
                   </Alert>
                 )}
               </Paper>
-            </Grid>
+              </Grid>
             
             <Grid item xs={12}>
               <Button
@@ -530,7 +544,7 @@ const ReportLostItem = () => {
               </Grid>
             )}
           </Grid>
-        </Box>
+        </form>
       </Paper>
     </Container>
   );

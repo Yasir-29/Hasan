@@ -425,101 +425,163 @@ const Profile = () => {
 
   // Function to navigate to the edit page for a lost item
   const handleEditLostItem = (item) => {
-    // Make sure item has an ID, if not, don't attempt to navigate
-    if (!item.id) {
-      setError("Cannot edit item: Item ID is missing");
-      return;
+    try {
+      // Get current lost items from localStorage
+      const storedLostItems = localStorage.getItem('userLostItems');
+      if (storedLostItems) {
+        const lostItems = JSON.parse(storedLostItems);
+        // Find the item to edit
+        const itemToEdit = lostItems.find(i => i.id === item.id);
+        if (itemToEdit) {
+          // Navigate to edit page with item data
+          navigate(`/edit-lost/${item.id}`, { 
+            state: { 
+              isEditing: true, 
+              item: {
+                ...itemToEdit,
+                dateLost: itemToEdit.date ? new Date(itemToEdit.date) : null,
+                name: itemToEdit.name,
+                category: itemToEdit.category,
+                description: itemToEdit.description,
+                location: itemToEdit.location,
+                color: itemToEdit.color,
+                uniqueIdentifiers: itemToEdit.uniqueIdentifiers,
+                contactInfo: itemToEdit.contactInfo,
+                reward: itemToEdit.reward,
+                isEmergency: itemToEdit.isEmergency || false,
+                isResolved: itemToEdit.isResolved || false,
+                resolvedDate: itemToEdit.resolvedDate || null
+              }
+            } 
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error editing lost item:', error);
+      setAlertMessage('Failed to edit item');
+      setAlertSeverity('error');
+      setShowAlert(true);
     }
-    
-    console.log("Editing lost item:", item);
-    navigate(`/edit-lost/${item.id}`, { state: { isEditing: true, item } });
   };
 
   // Function to navigate to the edit page for a found item
   const handleEditFoundItem = (item) => {
-    // Make sure item has an ID, if not, don't attempt to navigate
-    if (!item.id) {
-      setError("Cannot edit item: Item ID is missing");
-      return;
+    try {
+      // Get current found items from localStorage
+      const storedFoundItems = localStorage.getItem('userFoundItems');
+      if (storedFoundItems) {
+        const foundItems = JSON.parse(storedFoundItems);
+        // Find the item to edit
+        const itemToEdit = foundItems.find(i => i.id === item.id);
+        if (itemToEdit) {
+          // Navigate to edit page with item data
+          navigate(`/edit-found/${item.id}`, { 
+            state: { 
+              isEditing: true, 
+              item: {
+                ...itemToEdit,
+                dateFound: new Date(itemToEdit.date), // Convert date string to Date object
+                name: itemToEdit.name,
+                category: itemToEdit.category,
+                description: itemToEdit.description,
+                location: itemToEdit.location,
+                color: itemToEdit.color,
+                uniqueIdentifiers: itemToEdit.uniqueIdentifiers,
+                contactInfo: itemToEdit.contactInfo,
+                dropOffLocation: itemToEdit.dropOffLocation,
+                isEmergency: itemToEdit.isEmergency || false
+              }
+            } 
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error editing found item:', error);
+      setAlertMessage('Failed to edit item');
+      setAlertSeverity('error');
+      setShowAlert(true);
     }
-    
-    console.log("Editing found item:", item);
-    navigate(`/edit-found/${item.id}`, { state: { isEditing: true, item } });
   };
 
   // Function to delete a lost item
-  const handleDeleteLostItem = async (itemId) => {
-    // Check if the ID exists
-    if (!itemId) {
-      setError("Cannot delete item: Item ID is missing");
-      return;
-    }
-    
+  const handleDeleteLostItem = (itemId) => {
     try {
-      setLoading(true);
-      console.log("Deleting lost item with ID:", itemId);
-      
-      // Handle mock data (IDs starting with '10')
-      const isMockItem = typeof itemId === 'string' && itemId.startsWith('10');
-      
-      if (!isMockItem) {
-        // Call API to delete the item (only for real items)
-        await deleteLostItem(itemId);
-      } else {
-        // Simulate API delay for mock items
-        await new Promise(resolve => setTimeout(resolve, 500));
+      // Get current lost items from localStorage
+      const storedLostItems = localStorage.getItem('userLostItems');
+      if (storedLostItems) {
+        const lostItems = JSON.parse(storedLostItems);
+        // Filter out the item to be deleted
+        const updatedItems = lostItems.filter(item => item.id !== itemId);
+        // Save updated list back to localStorage
+        localStorage.setItem('userLostItems', JSON.stringify(updatedItems));
+        
+        // Update state to reflect changes
+        setReportedItems(updatedItems);
+
+        // Add notification for item deletion
+        const storedNotifications = localStorage.getItem('userNotifications') || '[]';
+        const notifications = JSON.parse(storedNotifications);
+        const newNotification = {
+          id: Date.now(),
+          type: 'item_deleted',
+          message: 'A lost item has been deleted from your profile',
+          date: new Date().toISOString().split('T')[0],
+          isRead: false
+        };
+        notifications.unshift(newNotification);
+        localStorage.setItem('userNotifications', JSON.stringify(notifications));
+
+        // Show success message
+        setAlertMessage('Item deleted successfully');
+        setAlertSeverity('success');
+        setShowAlert(true);
       }
-      
-      // Update local state
-      const updatedItems = reportedItems.filter(item => item.id !== itemId);
-      setReportedItems(updatedItems);
-      localStorage.setItem('userLostItems', JSON.stringify(updatedItems));
-      
-      setLoading(false);
-      alert('Item deleted successfully');
-    } catch (err) {
-      setLoading(false);
-      const errorMsg = err.message || 'Failed to delete item. Please try again.';
-      setError(errorMsg);
-      console.error('Error deleting lost item:', err);
+    } catch (error) {
+      console.error('Error deleting lost item:', error);
+      setAlertMessage('Failed to delete item');
+      setAlertSeverity('error');
+      setShowAlert(true);
     }
   };
 
   // Function to delete a found item
-  const handleDeleteFoundItem = async (itemId) => {
-    // Check if the ID exists
-    if (!itemId) {
-      setError("Cannot delete item: Item ID is missing");
-      return;
-    }
-    
+  const handleDeleteFoundItem = (itemId) => {
     try {
-      setLoading(true);
-      console.log("Deleting found item with ID:", itemId);
-      
-      // Handle mock data (IDs starting with '20')
-      const isMockItem = typeof itemId === 'string' && itemId.startsWith('20');
-      
-      if (!isMockItem) {
-        // Call API to delete the item (only for real items)
-        await deleteFoundItem(itemId);
-      } else {
-        // Simulate API delay for mock items
-        await new Promise(resolve => setTimeout(resolve, 500));
+      // Get current found items from localStorage
+      const storedFoundItems = localStorage.getItem('userFoundItems');
+      if (storedFoundItems) {
+        const foundItems = JSON.parse(storedFoundItems);
+        // Filter out the item to be deleted
+        const updatedItems = foundItems.filter(item => item.id !== itemId);
+        // Save updated list back to localStorage
+        localStorage.setItem('userFoundItems', JSON.stringify(updatedItems));
+        
+        // Update state to reflect changes
+        setFoundItems(updatedItems);
+
+        // Add notification for item deletion
+        const storedNotifications = localStorage.getItem('userNotifications') || '[]';
+        const notifications = JSON.parse(storedNotifications);
+        const newNotification = {
+          id: Date.now(),
+          type: 'item_deleted',
+          message: 'A found item has been deleted from your profile',
+          date: new Date().toISOString().split('T')[0],
+          isRead: false
+        };
+        notifications.unshift(newNotification);
+        localStorage.setItem('userNotifications', JSON.stringify(notifications));
+
+        // Show success message
+        setAlertMessage('Item deleted successfully');
+        setAlertSeverity('success');
+        setShowAlert(true);
       }
-      
-      // Update local state
-      const updatedItems = foundItems.filter(item => item.id !== itemId);
-      setFoundItems(updatedItems);
-      localStorage.setItem('userFoundItems', JSON.stringify(updatedItems));
-      
-      setLoading(false);
-      alert('Item deleted successfully');
-    } catch (err) {
-      setLoading(false);
-      const errorMsg = err.message || 'Failed to delete item. Please try again.';
-      setError(errorMsg);
-      console.error('Error deleting found item:', err);
+    } catch (error) {
+      console.error('Error deleting found item:', error);
+      setAlertMessage('Failed to delete item');
+      setAlertSeverity('error');
+      setShowAlert(true);
     }
   };
 
@@ -881,7 +943,16 @@ const Profile = () => {
                   <Grid container spacing={3}>
                     {reportedItems.map((item) => (
                       <Grid item xs={12} sm={6} key={item.id}>
-                        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <Card 
+                          sx={{ 
+                            height: '100%', 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            border: item.isEmergency ? '2px solid' : 'none',
+                            borderColor: 'error.main',
+                            bgcolor: item.isEmergency ? 'error.50' : 'background.paper'
+                          }}
+                        >
                           <CardMedia
                             component="img"
                             height="140"
@@ -893,11 +964,21 @@ const Profile = () => {
                               <Typography gutterBottom variant="h6" component="div">
                                 {item.name}
                               </Typography>
-                              <Chip 
-                                label={item.isResolved ? 'Found' : 'Still Lost'} 
-                                color={item.isResolved ? 'success' : 'error'} 
-                                size="small" 
-                              />
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                {item.isEmergency && (
+                                  <Chip 
+                                    label="Emergency" 
+                                    color="error" 
+                                    size="small"
+                                    sx={{ fontWeight: 'bold' }}
+                                  />
+                                )}
+                                <Chip 
+                                  label={item.isResolved ? 'Found' : 'Still Lost'} 
+                                  color={item.isResolved ? 'success' : 'error'} 
+                                  size="small" 
+                                />
+                              </Box>
                             </Box>
                             <Typography variant="body2" color="text.secondary" paragraph>
                               {item.description && item.description.substring(0, 100)}...
@@ -969,7 +1050,16 @@ const Profile = () => {
                   <Grid container spacing={3}>
                     {foundItems.map((item) => (
                       <Grid item xs={12} sm={6} key={item.id}>
-                        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <Card 
+                          sx={{ 
+                            height: '100%', 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            border: item.isEmergency ? '2px solid' : 'none',
+                            borderColor: 'error.main',
+                            bgcolor: item.isEmergency ? 'error.50' : 'background.paper'
+                          }}
+                        >
                           <CardMedia
                             component="img"
                             height="140"
@@ -981,11 +1071,21 @@ const Profile = () => {
                               <Typography gutterBottom variant="h6" component="div">
                                 {item.name}
                               </Typography>
-                              <Chip 
-                                label={item.isResolved ? 'Returned' : 'Not Returned'} 
-                                color={item.isResolved ? 'success' : 'warning'} 
-                                size="small" 
-                              />
+                              <Box sx={{ display: 'flex', gap: 1 }}>
+                                {item.isEmergency && (
+                                  <Chip 
+                                    label="Emergency" 
+                                    color="error" 
+                                    size="small"
+                                    sx={{ fontWeight: 'bold' }}
+                                  />
+                                )}
+                                <Chip 
+                                  label={item.isResolved ? 'Returned' : 'Not Returned'} 
+                                  color={item.isResolved ? 'success' : 'warning'} 
+                                  size="small" 
+                                />
+                              </Box>
                             </Box>
                             <Typography variant="body2" color="text.secondary" paragraph>
                               {item.description && item.description.substring(0, 100)}...

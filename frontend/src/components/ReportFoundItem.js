@@ -4,6 +4,8 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { reportFoundItem, updateFoundItem, getFoundItemById } from '../services/api';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const ReportFoundItem = () => {
   const navigate = useNavigate();
@@ -12,6 +14,8 @@ const ReportFoundItem = () => {
   const isEditing = location.state?.isEditing || false;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [map, setMap] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
   
   const [formData, setFormData] = useState({
     itemName: '',
@@ -24,8 +28,43 @@ const ReportFoundItem = () => {
     contactInfo: '',
     dropOffLocation: '',
     isEmergency: false,
-    image: null
+    image: null,
+    coordinates: null
   });
+
+  // Initialize map
+  useEffect(() => {
+    // Initialize map
+    const mapInstance = L.map('location-picker').setView([51.505, -0.09], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(mapInstance);
+
+    // Add click handler to map
+    let marker;
+    mapInstance.on('click', (e) => {
+      const { lat, lng } = e.latlng;
+      if (marker) {
+        marker.setLatLng([lat, lng]);
+      } else {
+        marker = L.marker([lat, lng]).addTo(mapInstance);
+      }
+      setSelectedLocation({ lat, lng });
+      setFormData(prev => ({
+        ...prev,
+        coordinates: { lat, lng },
+        location: `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+      }));
+    });
+
+    setMap(mapInstance);
+
+    // Cleanup
+    return () => {
+      mapInstance.remove();
+    };
+  }, []);
 
   // Load item data for editing or from local storage for new item
   useEffect(() => {
@@ -82,14 +121,14 @@ const ReportFoundItem = () => {
         }
       } else {
         // Load form data from local storage when component mounts (for new items)
-        const savedFormData = localStorage.getItem('foundItemFormData');
-        if (savedFormData) {
-          const parsedData = JSON.parse(savedFormData);
-          if (parsedData.dateFound) {
-            parsedData.dateFound = new Date(parsedData.dateFound);
-          }
-          setFormData(parsedData);
-        }
+    const savedFormData = localStorage.getItem('foundItemFormData');
+    if (savedFormData) {
+      const parsedData = JSON.parse(savedFormData);
+      if (parsedData.dateFound) {
+        parsedData.dateFound = new Date(parsedData.dateFound);
+      }
+      setFormData(parsedData);
+    }
       }
     };
 
@@ -123,10 +162,10 @@ const ReportFoundItem = () => {
     
     // Only save to local storage if not editing
     if (!isEditing) {
-      // Save to local storage (excluding the image)
-      const dataForStorage = { ...updatedFormData };
-      delete dataForStorage.image;
-      localStorage.setItem('foundItemFormData', JSON.stringify(dataForStorage));
+    // Save to local storage (excluding the image)
+    const dataForStorage = { ...updatedFormData };
+    delete dataForStorage.image;
+    localStorage.setItem('foundItemFormData', JSON.stringify(dataForStorage));
     }
   };
 
@@ -139,10 +178,10 @@ const ReportFoundItem = () => {
     
     // Only save to local storage if not editing
     if (!isEditing) {
-      // Save to local storage (excluding the image)
-      const dataForStorage = { ...updatedFormData };
-      delete dataForStorage.image;
-      localStorage.setItem('foundItemFormData', JSON.stringify(dataForStorage));
+    // Save to local storage (excluding the image)
+    const dataForStorage = { ...updatedFormData };
+    delete dataForStorage.image;
+    localStorage.setItem('foundItemFormData', JSON.stringify(dataForStorage));
     }
   };
 
@@ -251,6 +290,7 @@ const ReportFoundItem = () => {
       } else {
         // Create new item
         await reportFoundItem(itemData);
+        
         // Clear the form data from local storage after successful submission
         localStorage.removeItem('foundItemFormData');
         
@@ -260,7 +300,7 @@ const ReportFoundItem = () => {
         
         // Create a mock item for immediate display in profile
         const newItem = {
-          id: `2${Date.now().toString().slice(-4)}`, // Create a mock ID starting with '2'
+          id: `2${Date.now().toString().slice(-4)}`,
           name: itemData.name,
           category: itemData.category,
           description: itemData.description,
@@ -272,12 +312,27 @@ const ReportFoundItem = () => {
           dropOffLocation: itemData.dropOffLocation,
           isEmergency: itemData.isEmergency,
           isResolved: false,
-          image: 'https://via.placeholder.com/150' // Default placeholder image
+          image: 'https://via.placeholder.com/150'
         };
         
         // Add to the beginning of the array
         foundItems.unshift(newItem);
         localStorage.setItem('userFoundItems', JSON.stringify(foundItems));
+
+        // Add notification for the found item
+        const storedNotifications = localStorage.getItem('userNotifications') || '[]';
+        const notifications = JSON.parse(storedNotifications);
+        const newNotification = {
+          id: Date.now(),
+          type: 'found_item',
+          message: `You reported a found item: ${itemData.name}`,
+          date: new Date().toISOString().split('T')[0],
+          isRead: false,
+          itemId: newItem.id
+        };
+        
+        notifications.unshift(newNotification);
+        localStorage.setItem('userNotifications', JSON.stringify(notifications));
         
         // Update user points for reporting a found item
         const storedUser = localStorage.getItem('user');
@@ -298,112 +353,24 @@ const ReportFoundItem = () => {
           // Save updated user data
           localStorage.setItem('user', JSON.stringify(updatedUser));
           
-          // Award badges based on number of found items
-          const totalFoundItems = foundItems.length + 1; // +1 for the current item being reported
-          
-          // Determine which badges to award
-          let newBadges = [];
-          if (totalFoundItems >= 1 && !user.badges?.includes('First Find')) {
-            newBadges.push('First Find');
-          }
-          if (totalFoundItems >= 5 && !user.badges?.includes('Helpful Citizen')) {
-            newBadges.push('Helpful Citizen');
-          }
-          if (totalFoundItems >= 10 && !user.badges?.includes('Community Hero')) {
-            newBadges.push('Community Hero');
-          }
-          if (totalFoundItems >= 20 && !user.badges?.includes('Lost & Found Expert')) {
-            newBadges.push('Lost & Found Expert');
-          }
-          
-          // Category-specific badges
-          const categoryBadges = {
-            'Electronics': 'Tech Finder',
-            'Jewelry': 'Treasure Hunter',
-            'Important Documents': 'Document Rescuer',
-            'Wallet/Purse': 'Wallet Saver',
-            'Identification': 'ID Guardian',
-            'Passport': 'Global Citizen Helper',
-            'Credit/Debit Cards': 'Financial Protector'
-          };
-          
-          // Check if user has found an item in this category before
-          const categoryName = formData.category;
-          if (categoryBadges[categoryName] && !user.badges?.includes(categoryBadges[categoryName])) {
-            // Check if this is their first item in this category
-            const itemsInCategory = foundItems.filter(item => item.category === categoryName).length;
-            if (itemsInCategory === 0) {
-              // This is their first item in this category
-              newBadges.push(categoryBadges[categoryName]);
-            }
-          }
-          
-          // If there are new badges, update user badges
-          if (newBadges.length > 0) {
-            const currentBadges = user.badges || [];
-            const updatedBadges = [...currentBadges, ...newBadges];
-            
-            // Update user with new badges
-            const userWithBadges = {
-              ...updatedUser,
-              badges: updatedBadges
-            };
-            
-            localStorage.setItem('user', JSON.stringify(userWithBadges));
-            
-            // Add notifications for each new badge
-            newBadges.forEach(badge => {
-              const badgeNotification = {
-                id: Date.now() + Math.random(), // Ensure unique ID
-                type: 'badge',
-                message: `Congratulations! You've earned the "${badge}" badge!`,
-                date: new Date().toISOString().split('T')[0],
-                isRead: false
-              };
-              
-              notifications.unshift(badgeNotification);
-            });
-            
-            // Save updated notifications
-            localStorage.setItem('userNotifications', JSON.stringify(notifications));
-            
-            // Show badge alert
-            if (newBadges.length === 1) {
-              alert(`Congratulations! You've earned the "${newBadges[0]}" badge!`);
-            } else if (newBadges.length > 1) {
-              alert(`Congratulations! You've earned ${newBadges.length} new badges: ${newBadges.join(', ')}!`);
-            }
-          }
-          
-          // Add a notification about earning points
-          const storedNotifications = localStorage.getItem('userNotifications') || '[]';
-          const notifications = JSON.parse(storedNotifications);
-          const newNotification = {
-            id: Date.now(), // Use timestamp as unique ID
-            type: updatedLevel === 'Gold' && user.level !== 'Gold' ? 'gold' : 'points',
-            message: updatedLevel === 'Gold' && user.level !== 'Gold' 
-              ? `Congratulations! You've earned 50 points and reached Gold Member status!` 
-              : `You earned 50 points for reporting a found item!`,
+          // Add points notification
+          const pointsNotification = {
+            id: Date.now() + 1,
+            type: 'points',
+            message: `You earned 50 points for reporting a found item!`,
             date: new Date().toISOString().split('T')[0],
             isRead: false
           };
           
-          notifications.unshift(newNotification); // Add to beginning of array
+          notifications.unshift(pointsNotification);
           localStorage.setItem('userNotifications', JSON.stringify(notifications));
           
-          // Show appropriate message about points and status
-          if (updatedLevel === 'Gold' && user.level !== 'Gold') {
-            alert(`Congratulations! You've earned 50 points (total: ${updatedPoints}) and have been upgraded to Gold Member status!`);
+          // Special alert for emergency items
+          if (formData.isEmergency) {
+            alert('EMERGENCY NOTICE: This valuable item has been reported with priority status. Our team will take immediate action to find the owner.');
           } else {
-            alert(`Thank you for reporting a found item! You've earned 50 points (total: ${updatedPoints}).`);
+            alert('Thank you for reporting a found item! We will try to find its owner.');
           }
-        }
-        
-        // Special alert for emergency items
-        if (formData.isEmergency) {
-          alert('EMERGENCY NOTICE: This valuable item has been reported with priority status. Our team will take immediate action to find the owner.');
-        } else {
-          alert('Thank you for reporting a found item! We will try to find its owner.');
         }
       }
       
@@ -442,34 +409,19 @@ const ReportFoundItem = () => {
   };
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          {isEditing ? 'Edit Found Item' : 'Report a Found Item'}
-        </Typography>
-        <Typography variant="body1" color="textSecondary" paragraph>
-          Please provide as much detail as possible to help us find the owner.
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h4" gutterBottom>
+          {isEditing ? 'Edit Found Item' : 'Report Found Item'}
         </Typography>
 
         {error && (
-          <Typography variant="body2" color="error" sx={{ mb: 2 }}>
-            {error}
-          </Typography>
-        )}
-
-        {isHighValueItem() && !formData.isEmergency && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            This appears to be a high-value item. Consider enabling Emergency Mode for faster processing.
-          </Alert>
-        )}
-
-        {formData.isEmergency && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            EMERGENCY MODE ACTIVE: This item will be prioritized for faster processing.
+            {error}
           </Alert>
         )}
 
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
+        <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <FormControlLabel
@@ -541,15 +493,25 @@ const ReportFoundItem = () => {
                 />
               </LocalizationProvider>
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Select Location on Map
+              </Typography>
+              <Paper elevation={1} sx={{ p: 1, mb: 2 }}>
+                <div id="location-picker" style={{ height: '400px', width: '100%' }}></div>
+              </Paper>
+            </Grid>
+            <Grid item xs={12}>
               <TextField
                 required
                 fullWidth
-                label="Location Found"
+                label="Location Details"
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
-                placeholder="Be as specific as possible"
+                placeholder="Click on the map or enter location details manually"
+                multiline
+                rows={2}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -639,7 +601,7 @@ const ReportFoundItem = () => {
               </Grid>
             )}
           </Grid>
-        </Box>
+        </form>
       </Paper>
     </Container>
   );

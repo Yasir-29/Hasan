@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Typography, Box, Paper } from '@mui/material';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const MapView = () => {
   const [currentPosition, setCurrentPosition] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [map, setMap] = useState(null);
+
+  const mapContainerStyle = {
+    width: '100%',
+    height: '600px'
+  };
+
+  const defaultCenter = {
+    lat: 40.7580,
+    lng: -73.9855
+  };
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -27,15 +39,33 @@ const MapView = () => {
     }
   }, []);
 
-  const mapContainerStyle = {
-    width: '100%',
-    height: '600px'
-  };
+  useEffect(() => {
+    if (!loading && currentPosition) {
+      // Initialize map
+      const mapInstance = L.map('map-view').setView(
+        [currentPosition.lat, currentPosition.lng], 
+        15
+      );
 
-  const defaultCenter = {
-    lat: 40.7580,
-    lng: -73.9855
-  };
+      // Add tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(mapInstance);
+
+      // Add marker for current position
+      L.marker([currentPosition.lat, currentPosition.lng])
+        .addTo(mapInstance)
+        .bindPopup('Your current location')
+        .openPopup();
+
+      setMap(mapInstance);
+
+      // Cleanup function
+      return () => {
+        mapInstance.remove();
+      };
+    }
+  }, [loading, currentPosition]);
 
   if (loading) {
     return (
@@ -52,22 +82,7 @@ const MapView = () => {
       </Typography>
 
       <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
-        <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}>
-          <GoogleMap
-            mapContainerStyle={mapContainerStyle}
-            center={currentPosition || defaultCenter}
-            zoom={15}
-          >
-            {currentPosition && (
-              <Marker
-                position={currentPosition}
-                icon={{
-                  url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-                }}
-              />
-            )}
-          </GoogleMap>
-        </LoadScript>
+        <div id="map-view" style={mapContainerStyle}></div>
       </Paper>
     </Container>
   );

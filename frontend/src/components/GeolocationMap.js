@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Paper, Typography, CircularProgress } from '@mui/material';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const containerStyle = {
   width: '100%',
@@ -17,6 +18,7 @@ const GeolocationMap = ({ location }) => {
   const [currentPosition, setCurrentPosition] = useState(defaultCenter);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [map, setMap] = useState(null);
 
   useEffect(() => {
     // If location is provided, use it
@@ -48,6 +50,28 @@ const GeolocationMap = ({ location }) => {
     }
   }, [location]);
 
+  useEffect(() => {
+    if (!loading && !error) {
+      // Initialize map
+      const mapInstance = L.map('map').setView([currentPosition.lat, currentPosition.lng], 13);
+
+      // Add tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(mapInstance);
+
+      // Add marker
+      L.marker([currentPosition.lat, currentPosition.lng]).addTo(mapInstance);
+
+      setMap(mapInstance);
+
+      // Cleanup function
+      return () => {
+        mapInstance.remove();
+      };
+    }
+  }, [loading, error, currentPosition]);
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height={400}>
@@ -66,15 +90,7 @@ const GeolocationMap = ({ location }) => {
 
   return (
     <Paper elevation={3} sx={{ p: 2 }}>
-      <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}>
-        <GoogleMap
-          mapContainerStyle={containerStyle}
-          center={currentPosition}
-          zoom={15}
-        >
-          {currentPosition && <Marker position={currentPosition} />}
-        </GoogleMap>
-      </LoadScript>
+      <div id="map" style={containerStyle}></div>
     </Paper>
   );
 };
